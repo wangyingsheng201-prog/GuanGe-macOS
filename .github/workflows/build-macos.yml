@@ -47,13 +47,3 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create v1.1.0 'dist/GuanGe-macOS-Universal-1.1.0.zip#观格 macOS Universal 1.1.0' --title '观格 macOS 1.1.0' --notes '新增无通知的截图声光反馈、画幅与构图线居中淡入提示、中英文双语界面、自定义截图文件名规则，并调整控制面板底部布局。支持 Apple Silicon 与 Intel。由于作者暂无 Apple 开发者证书，本版本为临时签名，首次打开请按仓库说明操作。'
-name: 构建观格 macOS Universal 版本
-
-on:
-  workflow_dispatch:
-
-jobs:
-  paused:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "源码更新期间暂不自动构建"
