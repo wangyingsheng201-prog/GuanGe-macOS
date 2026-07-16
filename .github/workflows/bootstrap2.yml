@@ -1,4 +1,4 @@
-name: 引导观格 macOS 源码和构建（修正）
+base64 -Dname: 引导观格 macOS 源码和构建（修正）
 on:
   push:
     branches:
