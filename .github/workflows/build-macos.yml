@@ -2,49 +2,9 @@ name: 构建观格 macOS Universal 版本
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'Package.swift'
-      - 'Sources/**'
-      - 'Resources/**'
-      - 'scripts/**'
-      - '.github/workflows/build-macos.yml'
-
-permissions:
-  contents: write
 
 jobs:
-  build-release:
-    runs-on: macos-14
-    timeout-minutes: 30
+  paused:
+    runs-on: ubuntu-latest
     steps:
-      - name: 获取源码
-        uses: actions/checkout@v4
-
-      - name: 显示构建环境
-        run: |
-          swift --version
-          xcodebuild -version
-
-      - name: 构建 Intel 与 Apple Silicon 通用应用
-        run: bash scripts/build-app.sh
-
-      - name: 校验 Universal 架构与临时签名
-        run: |
-          lipo -info '.build-universal/观格-macOS-1.0.0/观格.app/Contents/MacOS/GuanGe'
-          codesign --verify --deep --strict --verbose=2 '.build-universal/观格-macOS-1.0.0/观格.app'
-
-      - name: 上传构建附件
-        uses: actions/upload-artifact@v4
-        with:
-          name: GuanGe-macOS-Universal-1.0.0
-          path: dist/GuanGe-macOS-Universal-1.0.0.zip
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: 发布 v1.0.0
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create v1.0.0 'dist/GuanGe-macOS-Universal-1.0.0.zip#观格 macOS Universal 1.0.0' --title '观格 macOS 1.0.0' --notes '首个 macOS 通用版本，支持 Apple Silicon 与 Intel。由于作者暂无 Apple 开发者证书，本版本为临时签名，首次打开请按仓库说明操作。'
+      - run: echo "源码更新期间暂不自动构建"
