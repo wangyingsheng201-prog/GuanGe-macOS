@@ -6,17 +6,22 @@ struct SettingsView: View {
     let captureScreenshot: () -> Void
     let showSupport: () -> Void
 
+    private var language: AppLanguage { model.settings.language }
+    private func t(_ chinese: String, _ english: String) -> String {
+        language.text(chinese, english)
+    }
+
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             header
-            HStack(alignment: .top, spacing: 12) {
-                VStack(spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(spacing: 10) {
                     displayAndFrame
                     lineAppearance
                 }
                 .frame(maxWidth: .infinity)
 
-                VStack(spacing: 12) {
+                VStack(spacing: 10) {
                     compositionTools
                     screenshotAndSystem
                 }
@@ -24,7 +29,7 @@ struct SettingsView: View {
             }
             footer
         }
-        .padding(16)
+        .padding(14)
         .frame(minWidth: 980, idealWidth: 1020, minHeight: 680, idealHeight: 710)
     }
 
@@ -37,14 +42,12 @@ struct SettingsView: View {
                     .frame(width: 44, height: 44)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text("观格")
+                Text(t("观格", "GuanGe"))
                     .font(.title2.bold())
-                Text("画面构图参考助手 · 所有设置即时生效")
+                Text(t("画面构图参考助手 · 所有设置即时生效", "Composition Guide Assistant · Changes apply instantly"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                Button("联系和打赏作者", action: showSupport)
-                    .buttonStyle(.link)
-                    .font(.caption)
+                languageSwitcher
             }
             Spacer()
             if !model.transientMessage.isEmpty {
@@ -53,25 +56,36 @@ struct SettingsView: View {
                     .font(.subheadline)
                     .transition(.opacity)
             }
-            Button(model.settings.guidesVisible ? "隐藏参考线" : "显示参考线") {
-                model.toggleGuides()
-            }
-            .buttonStyle(.borderedProminent)
         }
     }
 
+    private var languageSwitcher: some View {
+        HStack(spacing: 5) {
+            Button("简体中文") { model.settings.language = .zhHans }
+                .buttonStyle(.plain)
+                .foregroundStyle(language == .zhHans ? Color.accentColor : Color.secondary)
+                .fontWeight(language == .zhHans ? .semibold : .regular)
+            Text("|").foregroundStyle(.tertiary)
+            Button("English") { model.settings.language = .english }
+                .buttonStyle(.plain)
+                .foregroundStyle(language == .english ? Color.accentColor : Color.secondary)
+                .fontWeight(language == .english ? .semibold : .regular)
+        }
+        .font(.caption)
+    }
+
     private var displayAndFrame: some View {
-        SettingsGroup(title: "显示与画面", systemImage: "rectangle.on.rectangle") {
-            SettingRow("显示范围") {
+        SettingsGroup(title: t("显示与画面", "Display & Frame"), systemImage: "rectangle.on.rectangle") {
+            SettingRow(t("显示范围", "Display scope")) {
                 Picker("", selection: $model.settings.screenMode) {
-                    ForEach(ScreenMode.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(ScreenMode.allCases) { Text($0.displayName(language: language)).tag($0) }
                 }
                 .labelsHidden()
                 .frame(width: 180)
             }
 
             if model.settings.screenMode == .selected {
-                SettingRow("指定显示器") {
+                SettingRow(t("指定显示器", "Selected display")) {
                     Picker("", selection: $model.settings.selectedDisplayID) {
                         ForEach(Array(NSScreen.screens.enumerated()), id: \.offset) { index, screen in
                             Text("\(index + 1). \(screen.localizedName)")
@@ -83,9 +97,9 @@ struct SettingsView: View {
                 }
             }
 
-            SettingRow("画幅比例") {
+            SettingRow(t("画幅比例", "Aspect ratio")) {
                 Picker("", selection: $model.settings.frame) {
-                    ForEach(FramePreset.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(FramePreset.allCases) { Text($0.displayName(language: language)).tag($0) }
                 }
                 .labelsHidden()
                 .frame(width: 180)
@@ -93,7 +107,8 @@ struct SettingsView: View {
 
             Divider()
             ShortcutPair(
-                title: "轮巡画幅",
+                title: t("轮巡画幅", "Cycle aspect ratio"),
+                language: language,
                 previous: $model.settings.hotkeys.previousFrame,
                 next: $model.settings.hotkeys.nextFrame
             )
@@ -101,20 +116,20 @@ struct SettingsView: View {
     }
 
     private var compositionTools: some View {
-        SettingsGroup(title: "构图辅助", systemImage: "grid") {
-            SettingRow("主构图线") {
+        SettingsGroup(title: t("构图辅助", "Composition Guides"), systemImage: "grid") {
+            SettingRow(t("主构图线", "Primary guide")) {
                 Picker("", selection: $model.settings.guide) {
-                    ForEach(GuidePreset.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(GuidePreset.allCases) { Text($0.displayName(language: language)).tag($0) }
                 }
                 .labelsHidden()
                 .frame(width: 225)
             }
 
-            Toggle("显示对角线", isOn: $model.settings.showDiagonals)
-            Toggle("显示安全框", isOn: $model.settings.showSafeFrame)
+            Toggle(t("显示对角线", "Show diagonals"), isOn: $model.settings.showDiagonals)
+            Toggle(t("显示安全框", "Show safe frame"), isOn: $model.settings.showSafeFrame)
 
             HStack {
-                Text("安全框范围")
+                Text(t("安全框范围", "Safe frame size"))
                 Slider(value: $model.settings.safePercent, in: 1...99, step: 1)
                     .disabled(!model.settings.showSafeFrame)
                 Text("\(Int(model.settings.safePercent))%")
@@ -122,7 +137,7 @@ struct SettingsView: View {
                     .frame(width: 38, alignment: .trailing)
             }
 
-            SettingRow("安全框颜色") {
+            SettingRow(t("安全框颜色", "Safe frame color")) {
                 ColorWell(hex: $model.settings.safeColor)
                     .frame(width: 58, height: 24)
                     .disabled(!model.settings.showSafeFrame)
@@ -130,7 +145,8 @@ struct SettingsView: View {
 
             Divider()
             ShortcutPair(
-                title: "轮巡构图线",
+                title: t("轮巡构图线", "Cycle primary guide"),
+                language: language,
                 previous: $model.settings.hotkeys.previousGuide,
                 next: $model.settings.hotkeys.nextGuide
             )
@@ -138,11 +154,11 @@ struct SettingsView: View {
     }
 
     private var lineAppearance: some View {
-        SettingsGroup(title: "线条外观", systemImage: "paintpalette") {
-            SettingRow("预设颜色") {
+        SettingsGroup(title: t("线条外观", "Line Appearance"), systemImage: "paintpalette") {
+            SettingRow(t("预设颜色", "Preset color")) {
                 Picker("", selection: $model.settings.lineColor) {
                     ForEach(LinePaletteItem.all) { item in
-                        Text(item.name).tag(item.hex)
+                        Text(item.displayName(language: language)).tag(item.hex)
                     }
                 }
                 .labelsHidden()
@@ -152,7 +168,7 @@ struct SettingsView: View {
             }
 
             HStack {
-                Text("线条宽度")
+                Text(t("线条宽度", "Line width"))
                 Slider(value: $model.settings.lineWidth, in: 1...8, step: 0.5)
                 Text(String(format: "%.1f", model.settings.lineWidth))
                     .monospacedDigit()
@@ -160,7 +176,7 @@ struct SettingsView: View {
             }
 
             HStack {
-                Text("线条透明度")
+                Text(t("线条透明度", "Line opacity"))
                 Slider(value: $model.settings.lineOpacity, in: 0.1...1, step: 0.05)
                 Text("\(Int(model.settings.lineOpacity * 100))%")
                     .monospacedDigit()
@@ -169,7 +185,8 @@ struct SettingsView: View {
 
             Divider()
             ShortcutPair(
-                title: "轮巡线条颜色",
+                title: t("轮巡线条颜色", "Cycle line color"),
+                language: language,
                 previous: $model.settings.hotkeys.previousColor,
                 next: $model.settings.hotkeys.nextColor
             )
@@ -177,29 +194,42 @@ struct SettingsView: View {
     }
 
     private var screenshotAndSystem: some View {
-        SettingsGroup(title: "截屏与系统", systemImage: "camera.viewfinder") {
-            SettingRow("显示/隐藏参考线") {
-                HotkeyRecorder(hotkey: $model.settings.hotkeys.toggleGuides)
+        SettingsGroup(title: t("截屏与系统", "Screenshot & System"), systemImage: "camera.viewfinder") {
+            SettingRow(t("显示/隐藏参考线", "Show/hide guides")) {
+                HotkeyRecorder(hotkey: $model.settings.hotkeys.toggleGuides, language: language)
                     .frame(width: 112, height: 28)
             }
-            SettingRow("截屏") {
-                HotkeyRecorder(hotkey: $model.settings.hotkeys.screenshot)
+            SettingRow(t("截屏", "Screenshot")) {
+                HotkeyRecorder(hotkey: $model.settings.hotkeys.screenshot, language: language)
                     .frame(width: 112, height: 28)
-                Button("立即截屏", action: captureScreenshot)
             }
-            SettingRow("显示/隐藏面板") {
-                HotkeyRecorder(hotkey: $model.settings.hotkeys.togglePanel)
+            SettingRow(t("显示/隐藏面板", "Show/hide panel")) {
+                HotkeyRecorder(hotkey: $model.settings.hotkeys.togglePanel, language: language)
                     .frame(width: 112, height: 28)
             }
 
             HStack(spacing: 6) {
-                TextField("截图目录", text: $model.settings.screenshotDirectory)
+                Text(t("截图目录", "Screenshot folder"))
+                TextField(t("截图目录", "Screenshot folder"), text: $model.settings.screenshotDirectory)
                     .textFieldStyle(.roundedBorder)
-                Button("浏览") { model.chooseScreenshotDirectory() }
-                Button("打开目录") { model.openScreenshotDirectory() }
+                Button(t("浏览", "Browse")) { model.chooseScreenshotDirectory() }
             }
 
-            Toggle("登录时自动启动观格", isOn: Binding(
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(t("文件名规则", "Filename template"))
+                    TextField(AppSettings.defaultScreenshotFilenameTemplate, text: $model.settings.screenshotFilenameTemplate)
+                        .textFieldStyle(.roundedBorder)
+                }
+                Text(t(
+                    "可用变量：{date} {time} {frame} {guide} {display} {index}",
+                    "Tokens: {date} {time} {frame} {guide} {display} {index}"
+                ))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+
+            Toggle(t("登录时自动启动观格", "Launch GuanGe at login"), isOn: Binding(
                 get: { model.settings.launchAtLogin },
                 set: { model.applyLaunchAtLogin($0) }
             ))
@@ -207,19 +237,32 @@ struct SettingsView: View {
     }
 
     private var footer: some View {
-        HStack {
-            Text("感谢您的赞赏，如有意见和建议请联系作者：xingheyaoshi@163.com")
+        VStack(spacing: 5) {
+            Button(t("联系和打赏作者", "Contact & Support the Author"), action: showSupport)
+                .buttonStyle(.link)
                 .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Button("复位 / 重置") {
-                let alert = NSAlert()
-                alert.messageText = "恢复初始设置？"
-                alert.informativeText = "画幅、构图线、颜色、目录和所有快捷键都将恢复默认值。"
-                alert.addButton(withTitle: "恢复")
-                alert.addButton(withTitle: "取消")
-                if alert.runModal() == .alertFirstButtonReturn { model.reset() }
+
+            HStack(spacing: 10) {
+                Button(model.settings.guidesVisible
+                    ? t("隐藏参考线", "Hide Guides")
+                    : t("显示参考线", "Show Guides")) {
+                    model.toggleGuides()
+                }
+                Button(t("立即截屏", "Capture Screenshot"), action: captureScreenshot)
+                Button(t("打开截图目录", "Open Screenshot Folder")) { model.openScreenshotDirectory() }
+                Button(t("复位 / 重置", "Reset")) {
+                    let alert = NSAlert()
+                    alert.messageText = t("恢复初始设置？", "Restore Default Settings?")
+                    alert.informativeText = t(
+                        "画幅、构图线、颜色、目录、文件名规则和所有快捷键都将恢复默认值。",
+                        "Aspect ratio, guides, colors, folder, filename template, and shortcuts will be reset."
+                    )
+                    alert.addButton(withTitle: t("恢复", "Restore"))
+                    alert.addButton(withTitle: t("取消", "Cancel"))
+                    if alert.runModal() == .alertFirstButtonReturn { model.reset() }
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
     }
 
@@ -272,6 +315,7 @@ private struct SettingRow<Content: View>: View {
 
 private struct ShortcutPair: View {
     let title: String
+    let language: AppLanguage
     @Binding var previous: HotkeySpec
     @Binding var next: HotkeySpec
 
@@ -279,15 +323,15 @@ private struct ShortcutPair: View {
         HStack(spacing: 6) {
             Text(title)
             Spacer()
-            Text("上一个")
+            Text(language.text("上一个", "Previous"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            HotkeyRecorder(hotkey: $previous)
+            HotkeyRecorder(hotkey: $previous, language: language)
                 .frame(width: 84, height: 28)
-            Text("下一个")
+            Text(language.text("下一个", "Next"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            HotkeyRecorder(hotkey: $next)
+            HotkeyRecorder(hotkey: $next, language: language)
                 .frame(width: 84, height: 28)
         }
     }

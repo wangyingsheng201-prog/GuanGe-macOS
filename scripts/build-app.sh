@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$ROOT/.build-universal"
-STAGE="$WORK/观格-macOS-1.0.0"
+STAGE="$WORK/观格-macOS-1.1.0"
 APP="$STAGE/观格.app"
 CONTENTS="$APP/Contents"
 MACOS="$CONTENTS/MacOS"
@@ -62,5 +62,5 @@ cp "$ROOT/首次运行.command" "$STAGE/首次运行.command"
 chmod +x "$STAGE/首次运行.command"
 
 echo "[6/6] 打包"
-ditto -c -k --sequesterRsrc --keepParent "$STAGE" "$DIST/GuanGe-macOS-Universal-1.0.0.zip"
-echo "完成：$DIST/GuanGe-macOS-Universal-1.0.0.zip"
+ditto -c -k --sequesterRsrc --keepParent "$STAGE" "$DIST/GuanGe-macOS-Universal-1.1.0.zip"
+echo "完成：$DIST/GuanGe-macOS-Universal-1.1.0.zip"

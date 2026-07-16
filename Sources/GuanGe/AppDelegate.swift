@@ -9,13 +9,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let overlayController = OverlayController()
     private let screenshotService = ScreenshotService()
     private let hotKeyManager = GlobalHotKeyManager()
+    private let shutterSound = NSSound(named: NSSound.Name("Tink")) ?? NSSound(named: NSSound.Name("Glass"))
     private var settingsWindow: NSWindow?
     private var supportWindow: NSWindow?
     private var statusItem: NSStatusItem?
     private var settingsSubscription: AnyCancellable?
     private var screenSubscription: AnyCancellable?
     private var lastHotkeys: AppHotkeys?
+    private var lastRegisteredLanguage: AppLanguage?
+    private var lastFrame: FramePreset?
+    private var lastGuide: GuidePreset?
+    private weak var openPanelMenuItem: NSMenuItem?
     private weak var toggleGuidesMenuItem: NSMenuItem?
+    private weak var screenshotMenuItem: NSMenuItem?
+    private weak var supportMenuItem: NSMenuItem?
+    private weak var quitMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -43,11 +51,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .sink { [weak self] settings in
                 guard let self else { return }
                 self.overlayController.update(settings: settings)
-                if self.lastHotkeys != settings.hotkeys {
+                if self.lastHotkeys != settings.hotkeys || self.lastRegisteredLanguage != settings.language {
                     self.lastHotkeys = settings.hotkeys
-                    self.hotKeyManager.register(settings.hotkeys)
+                    self.lastRegisteredLanguage = settings.language
+                    self.hotKeyManager.register(settings.hotkeys, language: settings.language)
                 }
-                self.toggleGuidesMenuItem?.title = settings.guidesVisible ? "隐藏参考线" : "显示参考线"
+                if let previous = self.lastFrame, previous != settings.frame {
+                    self.overlayController.showSelectionMessage(
+                        settings.frame.displayName(language: settings.language),
+                        settings: settings
+                    )
+                }
+                if let previous = self.lastGuide, previous != settings.guide {
+                    self.overlayController.showSelectionMessage(
+                        settings.guide.displayName(language: settings.language),
+                        settings: settings
+                    )
+                }
+                self.lastFrame = settings.frame
+                self.lastGuide = settings.guide
+                self.updateLocalizedInterface(settings: settings)
                 if self.settingsWindow?.isVisible == true { self.settingsWindow?.orderFrontRegardless() }
             }
     }
@@ -89,17 +112,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
 
         let menu = NSMenu()
-        menu.addItem(withTitle: "打开控制面板", action: #selector(showSettingsFromMenu), keyEquivalent: "")
-        let toggle = menu.addItem(withTitle: "隐藏参考线", action: #selector(toggleGuidesFromMenu), keyEquivalent: "")
-        toggleGuidesMenuItem = toggle
-        menu.addItem(withTitle: "立即截屏", action: #selector(captureFromMenu), keyEquivalent: "")
+        openPanelMenuItem = menu.addItem(withTitle: "打开控制面板", action: #selector(showSettingsFromMenu), keyEquivalent: "")
+        toggleGuidesMenuItem = menu.addItem(withTitle: "隐藏参考线", action: #selector(toggleGuidesFromMenu), keyEquivalent: "")
+        screenshotMenuItem = menu.addItem(withTitle: "立即截屏", action: #selector(captureFromMenu), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "联系和打赏作者", action: #selector(showSupportFromMenu), keyEquivalent: "")
+        supportMenuItem = menu.addItem(withTitle: "联系和打赏作者", action: #selector(showSupportFromMenu), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "退出观格", action: #selector(quitFromMenu), keyEquivalent: "q")
+        quitMenuItem = menu.addItem(withTitle: "退出观格", action: #selector(quitFromMenu), keyEquivalent: "q")
         menu.items.forEach { $0.target = self }
         item.menu = menu
         statusItem = item
+        updateLocalizedInterface(settings: model.settings)
     }
 
     @objc private func showSettingsFromMenu() { showSettings() }
@@ -120,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "观格 · 控制面板"
+        window.title = model.localized("观格 · 控制面板", "GuanGe · Control Panel")
         window.contentView = NSHostingView(rootView: view)
         window.minSize = NSSize(width: 980, height: 680)
         window.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
@@ -154,8 +177,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 backing: .buffered,
                 defer: false
             )
-            window.title = "联系和打赏作者"
-            window.contentView = NSHostingView(rootView: SupportView())
+            window.title = model.localized("联系和打赏作者", "Contact & Support the Author")
+            window.contentView = NSHostingView(rootView: SupportView(model: model))
             window.minSize = NSSize(width: 760, height: 520)
             window.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 2)
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -180,14 +203,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self.screenshotService.capture(settings: self.model.settings) { [weak self] result in
                 guard let self else { return }
                 switch result {
-                case .success(let urls):
-                    self.model.notify("已保存 \(urls.count) 张截图")
+                case .success:
+                    self.shutterSound?.stop()
+                    self.shutterSound?.play()
+                    self.overlayController.showScreenshotFlash(settings: self.model.settings)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                        self?.restoreWindows(settingsWasVisible: settingsWasVisible, supportWasVisible: supportWasVisible)
+                    }
                 case .failure(let error):
-                    self.model.showAlert(title: "截屏失败", message: error.localizedDescription)
+                    self.model.showAlert(
+                        title: self.model.localized("截屏失败", "Screenshot Failed"),
+                        message: error.localizedDescription
+                    )
+                    self.restoreWindows(settingsWasVisible: settingsWasVisible, supportWasVisible: supportWasVisible)
                 }
-                if settingsWasVisible { self.showSettings() }
-                if supportWasVisible { self.showSupport() }
             }
         }
+    }
+
+    private func restoreWindows(settingsWasVisible: Bool, supportWasVisible: Bool) {
+        if settingsWasVisible { showSettings() }
+        if supportWasVisible { showSupport() }
+    }
+
+    private func updateLocalizedInterface(settings: AppSettings) {
+        let language = settings.language
+        openPanelMenuItem?.title = language.text("打开控制面板", "Open Control Panel")
+        toggleGuidesMenuItem?.title = settings.guidesVisible
+            ? language.text("隐藏参考线", "Hide Guides")
+            : language.text("显示参考线", "Show Guides")
+        screenshotMenuItem?.title = language.text("立即截屏", "Capture Screenshot")
+        supportMenuItem?.title = language.text("联系和打赏作者", "Contact & Support the Author")
+        quitMenuItem?.title = language.text("退出观格", "Quit GuanGe")
+        statusItem?.button?.toolTip = language.text("观格 · 画面构图参考助手", "GuanGe · Composition Guide Assistant")
+        settingsWindow?.title = language.text("观格 · 控制面板", "GuanGe · Control Panel")
+        supportWindow?.title = language.text("联系和打赏作者", "Contact & Support the Author")
     }
 }

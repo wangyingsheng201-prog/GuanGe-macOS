@@ -26,24 +26,26 @@ final class AppModel: ObservableObject {
     }
 
     func reset() {
+        let language = settings.language
         settings = AppSettings()
+        settings.language = language
         applyLaunchAtLogin(false)
-        notify("已恢复初始设置")
+        notify(localized("已恢复初始设置", "Default settings restored"))
     }
 
     func toggleGuides() {
         settings.guidesVisible.toggle()
-        notify(settings.guidesVisible ? "参考线已显示" : "参考线已隐藏")
+        notify(settings.guidesVisible
+            ? localized("参考线已显示", "Guides shown")
+            : localized("参考线已隐藏", "Guides hidden"))
     }
 
     func cycleFrame(_ offset: Int) {
         settings.frame = Self.cycled(FramePreset.allCases, current: settings.frame, offset: offset)
-        notify("画幅：\(settings.frame.rawValue)")
     }
 
     func cycleGuide(_ offset: Int) {
         settings.guide = Self.cycled(GuidePreset.allCases, current: settings.guide, offset: offset)
-        notify("构图线：\(settings.guide.rawValue)")
     }
 
     func cycleLineColor(_ offset: Int) {
@@ -51,12 +53,12 @@ final class AppModel: ObservableObject {
         let current = palette.firstIndex { $0.hex.caseInsensitiveCompare(settings.lineColor) == .orderedSame } ?? 0
         let index = (current + offset + palette.count) % palette.count
         settings.lineColor = palette[index].hex
-        notify("线条颜色：\(palette[index].name)")
+        notify("\(localized("线条颜色", "Line color"))：\(palette[index].displayName(language: settings.language))")
     }
 
     func chooseScreenshotDirectory() {
         let panel = NSOpenPanel()
-        panel.title = "选择截图保存目录"
+        panel.title = localized("选择截图保存目录", "Choose Screenshot Folder")
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
@@ -83,8 +85,18 @@ final class AppModel: ObservableObject {
             }
         } catch {
             settings.launchAtLogin = false
-            showAlert(title: "无法设置开机启动", message: "请将观格放入“应用程序”文件夹后再试。\n\n\(error.localizedDescription)")
+            showAlert(
+                title: localized("无法设置开机启动", "Unable to Enable Launch at Login"),
+                message: localized(
+                    "请将观格放入“应用程序”文件夹后再试。",
+                    "Move GuanGe to the Applications folder and try again."
+                ) + "\n\n\(error.localizedDescription)"
+            )
         }
+    }
+
+    func localized(_ chinese: String, _ english: String) -> String {
+        settings.language.text(chinese, english)
     }
 
     func notify(_ text: String) {
@@ -99,7 +111,7 @@ final class AppModel: ObservableObject {
         alert.messageText = title
         alert.informativeText = message
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "好")
+        alert.addButton(withTitle: localized("好", "OK"))
         alert.runModal()
     }
 

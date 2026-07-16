@@ -60,7 +60,7 @@ final class GlobalHotKeyManager {
         if let eventHandlerRef { RemoveEventHandler(eventHandlerRef) }
     }
 
-    func register(_ hotkeys: AppHotkeys) {
+    func register(_ hotkeys: AppHotkeys, language: AppLanguage) {
         unregisterAll()
         let items: [(HotKeyAction, HotkeySpec)] = [
             (.toggleGuides, hotkeys.toggleGuides),
@@ -77,7 +77,7 @@ final class GlobalHotKeyManager {
         var failures: [String] = []
         for (action, spec) in items {
             var reference: EventHotKeyRef?
-            var identifier = EventHotKeyID(signature: signature, id: action.rawValue)
+            let identifier = EventHotKeyID(signature: signature, id: action.rawValue)
             let status = RegisterEventHotKey(
                 spec.keyCode,
                 spec.modifiers,
@@ -93,7 +93,10 @@ final class GlobalHotKeyManager {
             }
         }
         if !failures.isEmpty {
-            onRegistrationError?("这些快捷键已被系统或其他应用占用：\(failures.joined(separator: "、"))")
+            onRegistrationError?(language.text(
+                "这些快捷键已被系统或其他应用占用：\(failures.joined(separator: "、"))",
+                "These shortcuts are already used by macOS or another app: \(failures.joined(separator: ", "))"
+            ))
         }
     }
 
@@ -113,19 +116,19 @@ enum HotkeyFormatter {
         return result
     }
 
-    static func display(keyCode: UInt16, flags: NSEvent.ModifierFlags) -> String {
+    static func display(keyCode: UInt16, flags: NSEvent.ModifierFlags, language: AppLanguage) -> String {
         var text = ""
         if flags.contains(.control) { text += "⌃" }
         if flags.contains(.option) { text += "⌥" }
         if flags.contains(.shift) { text += "⇧" }
         if flags.contains(.command) { text += "⌘" }
-        text += keyName(for: keyCode)
+        text += keyName(for: keyCode, language: language)
         return text
     }
 
-    private static func keyName(for keyCode: UInt16) -> String {
+    private static func keyName(for keyCode: UInt16, language: AppLanguage) -> String {
         let special: [UInt16: String] = [
-            36: "↩", 48: "⇥", 49: "空格", 51: "⌫", 53: "⎋",
+            36: "↩", 48: "⇥", 49: language.text("空格", "Space"), 51: "⌫", 53: "⎋",
             115: "↖", 116: "⇞", 117: "⌦", 119: "↘", 121: "⇟",
             123: "←", 124: "→", 125: "↓", 126: "↑",
             122: "F1", 120: "F2", 99: "F3", 118: "F4", 96: "F5", 97: "F6",
@@ -140,6 +143,6 @@ enum HotkeyFormatter {
             18: "1", 19: "2", 20: "3", 21: "4", 22: "6", 23: "5", 25: "9",
             26: "7", 28: "8", 29: "0"
         ]
-        return letters[keyCode] ?? "键\(keyCode)"
+        return letters[keyCode] ?? language.text("键\(keyCode)", "Key \(keyCode)")
     }
 }

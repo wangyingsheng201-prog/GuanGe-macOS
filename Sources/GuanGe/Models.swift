@@ -2,12 +2,31 @@ import AppKit
 import Carbon
 import Foundation
 
+enum AppLanguage: String, Codable, CaseIterable, Identifiable {
+    case zhHans = "zh-Hans"
+    case english = "en"
+
+    var id: String { rawValue }
+
+    func text(_ chinese: String, _ english: String) -> String {
+        self == .zhHans ? chinese : english
+    }
+}
+
 enum ScreenMode: String, Codable, CaseIterable, Identifiable {
     case all = "全部显示器"
     case primary = "主显示器"
     case selected = "指定显示器"
 
     var id: String { rawValue }
+
+    func displayName(language: AppLanguage) -> String {
+        switch self {
+        case .all: return language.text("全部显示器", "All displays")
+        case .primary: return language.text("主显示器", "Primary display")
+        case .selected: return language.text("指定显示器", "Selected display")
+        }
+    }
 }
 
 enum FramePreset: String, Codable, CaseIterable, Identifiable {
@@ -27,6 +46,11 @@ enum FramePreset: String, Codable, CaseIterable, Identifiable {
     case verticalNineSixteen = "9:16"
 
     var id: String { rawValue }
+
+    func displayName(language: AppLanguage) -> String {
+        if self == .fit { return language.text("适配屏幕", "Fit display") }
+        return rawValue
+    }
 
     var aspectRatio: CGFloat? {
         switch self {
@@ -64,22 +88,45 @@ enum GuidePreset: String, Codable, CaseIterable, Identifiable {
     case dynamicSymmetry = "动态对称"
 
     var id: String { rawValue }
+
+    func displayName(language: AppLanguage) -> String {
+        switch self {
+        case .thirds: return language.text("三分法 / 九宫格", "Rule of Thirds")
+        case .halves: return language.text("二等分", "Halves")
+        case .fourGrid: return language.text("四等分网格", "4 × 4 Grid")
+        case .fiveGrid: return language.text("五等分网格", "5 × 5 Grid")
+        case .phiGrid: return language.text("黄金分割网格", "Golden Ratio Grid")
+        case .centerCross: return language.text("中心十字", "Center Cross")
+        case .goldenTriangleLeft: return language.text("黄金三角形（左）", "Golden Triangle (Left)")
+        case .goldenTriangleRight: return language.text("黄金三角形（右）", "Golden Triangle (Right)")
+        case .goldenSpiralTL: return language.text("黄金螺旋（左上）", "Golden Spiral (Top Left)")
+        case .goldenSpiralTR: return language.text("黄金螺旋（右上）", "Golden Spiral (Top Right)")
+        case .goldenSpiralBL: return language.text("黄金螺旋（左下）", "Golden Spiral (Bottom Left)")
+        case .goldenSpiralBR: return language.text("黄金螺旋（右下）", "Golden Spiral (Bottom Right)")
+        case .dynamicSymmetry: return language.text("动态对称", "Dynamic Symmetry")
+        }
+    }
 }
 
 struct LinePaletteItem: Identifiable, Equatable {
-    let name: String
+    let chineseName: String
+    let englishName: String
     let hex: String
     var id: String { hex }
 
+    func displayName(language: AppLanguage) -> String {
+        language == .zhHans ? chineseName : englishName
+    }
+
     static let all: [LinePaletteItem] = [
-        .init(name: "天蓝", hex: "#00AEEF"),
-        .init(name: "白色", hex: "#FFFFFF"),
-        .init(name: "黑色", hex: "#000000"),
-        .init(name: "红色", hex: "#FF3B30"),
-        .init(name: "橙色", hex: "#FF9500"),
-        .init(name: "黄色", hex: "#FFD60A"),
-        .init(name: "绿色", hex: "#34C759"),
-        .init(name: "紫色", hex: "#AF52DE")
+        .init(chineseName: "天蓝", englishName: "Sky Blue", hex: "#00AEEF"),
+        .init(chineseName: "白色", englishName: "White", hex: "#FFFFFF"),
+        .init(chineseName: "黑色", englishName: "Black", hex: "#000000"),
+        .init(chineseName: "红色", englishName: "Red", hex: "#FF3B30"),
+        .init(chineseName: "橙色", englishName: "Orange", hex: "#FF9500"),
+        .init(chineseName: "黄色", englishName: "Yellow", hex: "#FFD60A"),
+        .init(chineseName: "绿色", englishName: "Green", hex: "#34C759"),
+        .init(chineseName: "紫色", englishName: "Purple", hex: "#AF52DE")
     ]
 }
 
@@ -112,6 +159,9 @@ struct AppHotkeys: Codable, Equatable {
 }
 
 struct AppSettings: Codable, Equatable {
+    static let defaultScreenshotFilenameTemplate = "GuanGe-{date}-{time}"
+
+    var language = AppLanguage.zhHans
     var guidesVisible = true
     var screenMode = ScreenMode.all
     var selectedDisplayID = ""
@@ -127,8 +177,61 @@ struct AppSettings: Codable, Equatable {
     var screenshotDirectory = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Pictures")
         .appendingPathComponent("观格截图").path
+    var screenshotFilenameTemplate = Self.defaultScreenshotFilenameTemplate
     var launchAtLogin = false
     var hotkeys = AppHotkeys()
+}
+
+extension AppSettings {
+    private enum CodingKeys: String, CodingKey {
+        case language, guidesVisible, screenMode, selectedDisplayID, frame, guide
+        case lineColor, lineWidth, lineOpacity, showDiagonals, showSafeFrame
+        case safePercent, safeColor, screenshotDirectory, screenshotFilenameTemplate
+        case launchAtLogin, hotkeys
+    }
+
+    init(from decoder: Decoder) throws {
+        let defaults = AppSettings()
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        language = try container.decodeIfPresent(AppLanguage.self, forKey: .language) ?? defaults.language
+        guidesVisible = try container.decodeIfPresent(Bool.self, forKey: .guidesVisible) ?? defaults.guidesVisible
+        screenMode = try container.decodeIfPresent(ScreenMode.self, forKey: .screenMode) ?? defaults.screenMode
+        selectedDisplayID = try container.decodeIfPresent(String.self, forKey: .selectedDisplayID) ?? defaults.selectedDisplayID
+        frame = try container.decodeIfPresent(FramePreset.self, forKey: .frame) ?? defaults.frame
+        guide = try container.decodeIfPresent(GuidePreset.self, forKey: .guide) ?? defaults.guide
+        lineColor = try container.decodeIfPresent(String.self, forKey: .lineColor) ?? defaults.lineColor
+        lineWidth = try container.decodeIfPresent(Double.self, forKey: .lineWidth) ?? defaults.lineWidth
+        lineOpacity = try container.decodeIfPresent(Double.self, forKey: .lineOpacity) ?? defaults.lineOpacity
+        showDiagonals = try container.decodeIfPresent(Bool.self, forKey: .showDiagonals) ?? defaults.showDiagonals
+        showSafeFrame = try container.decodeIfPresent(Bool.self, forKey: .showSafeFrame) ?? defaults.showSafeFrame
+        safePercent = try container.decodeIfPresent(Double.self, forKey: .safePercent) ?? defaults.safePercent
+        safeColor = try container.decodeIfPresent(String.self, forKey: .safeColor) ?? defaults.safeColor
+        screenshotDirectory = try container.decodeIfPresent(String.self, forKey: .screenshotDirectory) ?? defaults.screenshotDirectory
+        screenshotFilenameTemplate = try container.decodeIfPresent(String.self, forKey: .screenshotFilenameTemplate) ?? defaults.screenshotFilenameTemplate
+        launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? defaults.launchAtLogin
+        hotkeys = try container.decodeIfPresent(AppHotkeys.self, forKey: .hotkeys) ?? defaults.hotkeys
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(language, forKey: .language)
+        try container.encode(guidesVisible, forKey: .guidesVisible)
+        try container.encode(screenMode, forKey: .screenMode)
+        try container.encode(selectedDisplayID, forKey: .selectedDisplayID)
+        try container.encode(frame, forKey: .frame)
+        try container.encode(guide, forKey: .guide)
+        try container.encode(lineColor, forKey: .lineColor)
+        try container.encode(lineWidth, forKey: .lineWidth)
+        try container.encode(lineOpacity, forKey: .lineOpacity)
+        try container.encode(showDiagonals, forKey: .showDiagonals)
+        try container.encode(showSafeFrame, forKey: .showSafeFrame)
+        try container.encode(safePercent, forKey: .safePercent)
+        try container.encode(safeColor, forKey: .safeColor)
+        try container.encode(screenshotDirectory, forKey: .screenshotDirectory)
+        try container.encode(screenshotFilenameTemplate, forKey: .screenshotFilenameTemplate)
+        try container.encode(launchAtLogin, forKey: .launchAtLogin)
+        try container.encode(hotkeys, forKey: .hotkeys)
+    }
 }
 
 extension NSColor {
